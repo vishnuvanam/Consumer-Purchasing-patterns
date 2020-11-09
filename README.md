@@ -9,4 +9,4 @@ With this data we have identified the most valuable customers by developing a mo
  
 ## Problem Statement
 
-	Company X is looking to create targeted advertising campaigns for their primarily online customers. They want to understand their customer spending habits and how much they might spend in their next online purchase. In addition, they would like to gain insights into the demographics of their highest value customers, such as their gender and geographical region.
+Company X is looking to create targeted advertising campaigns for their primarily online customers. They want to understand their customer spending habits and how much they might spend in their next online purchase. In addition, they would like to gain insights into the demographics of their highest value customers, such as their gender and geographical region.
