@@ -1,0 +1,28 @@
+---
+title: "Preprocessing_RFM"
+author: "Vishnu Vanam"
+date: "11/13/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+dataCompiled <- read.csv("../../Downloads/customer_data_2015_compiled V2.csv")
+dataCompiled_cols <- dataCompiled[,c(1,6,8)]
+
+```
+
+```{r}
+dataCompiled_cols <- dataCompiled[,c(1,6,8)]
+names(dataCompiled_cols) <- c("customer_id", "n_transactions", "transaction_date")
+dataCompiled_cols$recency_days <- dataCompiled_cols$analysis_date - dataCompiled_cols$transaction_date
+
+colnames(dataCompiled_cols) <- c("customer_id", "number_of_orders", "transaction_date", "analysis_date", "revenue")
+
+dataCompiled_cols$revenue <- dataCompiled$TotalSpent
+
+result <- rfm::rfm_table_customer(rfm_data_customer, customer_id, number_of_orders, recency_days, revenue, analysis_date)
+
+dataCompiledAfterRfm <- result$rfm
+```
+
