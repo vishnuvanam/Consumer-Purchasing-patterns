@@ -1,0 +1,97 @@
+# SQL query to modify and load the data
+
+CREATE VIEW [dbo].[vw_LatestTransacts] AS
+/*
+Selects the latest transaction for every customer
+Some customers may have only 1 transaction total, if that is the case
+	that transaction will be displayed in the view and that customer
+	will be selected out in a later query
+Total of 437,323 rows
+*/
+SELECT
+
+T.*
+
+FROM
+(
+
+	SELECT 
+	*, 
+	ROW_NUMBER() OVER (PARTITION BY CustomerID ORDER BY transactionDate DESC) AS TransactNumberRev
+
+	FROM  customer_transactions AS T
+	
+) AS T
+WHERE T.TransactNumberRev = 1
+GO
+
+-----
+--Second view is created to display all transactions EXCEPT for 
+--	the latest transactions that were extracted in the previous view.
+--This view is used for aggregating our summary statistics.
+-----
+
+
+CREATE VIEW [dbo].[vw_NMinusOneTransacts] AS
+/*
+Selects all of the transactions EXCEPT for the most recent transaction for each customer
+This naturally removes all customers that only made 1 transaction
+Total of 2,407,109 transactions to work with
+*/
+SELECT 
+
+T.*
+
+FROM customer_transactions AS T
+LEFT JOIN vw_CustomerTransactCount AS TC ON TC.CustomerID = T.CustomerID
+LEFT JOIN vw_LatestTransacts AS LT ON LT.CustomerID = T.CustomerID
+
+
+WHERE LT.transactionID <> T.transactionID
+
+GO
+
+-----
+--Select statement below produces the final results
+-----
+
+SELECT
+Agg.CustomerID
+, Agg.AvgSpent
+, Agg.TotalSpent
+, Agg.MaxSpent
+, Agg.MinSpent
+, Agg.TotalTransactions
+, Agg.FirstTransaction
+, Agg.LatestTransaction
+, (V.visits - 1) AS Visits
+, A.age
+, A.customersince
+, A.gender
+, A.region
+, LT.TransactionID AS NextTransactID
+, LT.Spends AS NextSpends
+, LT.TransactionDate AS NextTransactDate
+
+
+FROM
+(
+--This subquery aggregates all of our transaction data
+--By aggregating transaction data first we naturally select out
+--	all customers with only 1 transaction
+SELECT 
+T.customerid
+, SUM(T.spends) AS TotalSpent
+, MAX(T.spends) AS MaxSpent
+, MIN(T.spends) AS MinSpent
+, AVG(T.spends) AS AvgSpent
+, COUNT(T.transactionid) AS TotalTransactions
+, MIN(T.transactiondate) AS FirstTransaction
+, MAX(T.transactiondate) AS LatestTransaction
+ 
+FROM vw_NMinusOneTransacts AS T
+GROUP BY T.customerid
+) AS Agg
+LEFT JOIN customer_attr AS A ON A.customerid = Agg.customerid
+LEFT JOIN customer_visited AS V ON V.customerid = Agg.customerid
+LEFT JOIN vw_LatestTransacts AS LT ON LT.CustomerID = Agg.CustomerID
