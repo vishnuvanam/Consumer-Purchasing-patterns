@@ -1,0 +1,144 @@
+---
+title: "Data Aggregation and Formation of Final ADS"
+author: "Team"
+date: "10/28/2019"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+# library(NbClust)
+# library(factoextra)
+library(plotly)
+
+```
+
+
+## Initial Solution
+
+Aggregate the data and calculate the explanatory variables
+
+
+```{r reading the datasets, echo=FALSE}
+customerAttributes <- read.csv("Online_retail_Customer Detail/customer_data_2015_attr.csv")
+print("The below dataset contains the demographic information of each customer like Age, Gender")
+print(head(customerAttributes))
+
+customerVisits <- read.csv("Online_retail_Customer Detail/customer_data_2015_visited.csv")
+print("The below data shows how many each customer has visited the website")
+print(head(customerVisits))
+
+customerTransactions <- read.csv("Online_retail_Customer Detail/customer_data3_2015_transactions.csv")
+print("The below data depicts the transactional information of each customer, spend per transaction and also the date of transaction")
+print(head(customerTransactions))
+```
+
+
+
+## Merging the data
+In order to obtain both the customer attributes and visits in a single dataset we do the process of merging. 
+Prior to merging - need to check if the datasets for merging are at the same level or not
+
+### Checking the level of datasets to be merged
+
+```{r checking the level of datasets, echo=FALSE}
+print("Checking the level of customerAttributes dataset..")
+checkLevelAttr <- customerAttributes %>% group_by(CustomerId) %>% summarise(custPerRow = n())
+levelAttr <- checkLevelAttr[which(checkLevelAttr$custPerRow > 1), ]
+levelAttr <- data.frame(levelAttr)
+if(nrow(levelAttr) == 0) {
+  print("The customer attributes dataset is at customer level")
+} else {
+  print("The customer attributes dataset is not customer level")
+}
+
+print("Checking the level of customerVisits dataset..")
+checkLevelVis <- customerVisits %>% group_by(CustomerID) %>% summarise(totalVisits = sum(Visits, na.rm = TRUE), custPerRow = n())
+levelVis <- checkLevelVis[which(checkLevelVis$custPerRow > 1), ]
+levelVis <- data.frame(levelVis)
+if(nrow(levelVis) == 0) {
+  print("The customer visits dataset is at customer level")
+} else {
+  print("The customer visits dataset is not customer level")
+}
+
+```
+
+
+
+
+### Merging the visits and attributes datasets
+
+```{r merging, echo=FALSE}
+
+customerAttrVis <- merge(customerAttributes, customerVisits, by.x = "CustomerId", by.y = "CustomerID", all = FALSE)
+checkLevelAttrVis <- customerAttrVis %>% group_by(CustomerId) %>% summarise(custPerRow = n())
+levelAttrVis <- checkLevelAttrVis[which(checkLevelAttrVis$custPerRow > 1), ]
+levelAttrVis <- data.frame(levelAttrVis)
+if(nrow(levelVis) == 0) {
+  print("The merged dataset is at customer level")
+} else {
+  print("The merged dataset is not customer level")
+}
+print(paste("The number of customers in the merged dataset:", nrow(customerAttrVis), sep = ""))
+print(paste("The number of custoemrs in the attributes dataset:", nrow(customerAttributes), sep = ""))
+print(paste("The number of customers in the visits dataset:", nrow(customerVisits), sep = ""))
+
+if((nrow(customerAttributes) == nrow(customerVisits)) && (nrow(customerAttributes) == nrow(customerAttrVis))) {
+  print("The merged dataset has the same number of customers as the two parent datasets")
+}
+
+```
+
+
+## Analytical dataset creation for clustering
+
+```{r variableTransformation, echo=FALSE}
+### Transforming a few variables in the customerTransactions dataset
+#Converting transaction date to a date column 
+customerTransactions$transactionDate <- as.Date(customerTransactions$transactionDate, '%Y-%m-%d')
+latestDate <- max(customerTransactions$transactionDate)
+earliestDate <- min(customerTransactions$transactionDate)
+dateRange <- dplyr::filter(customerTransactions, between(customerTransactions$transactionDate, earliestDate, latestDate))
+if(nrow(dateRange) > 0) {
+  print(paste("The transactions lie between: ", earliestDate, " to ", latestDate, sep = ""))
+}
+
+## Checking if any customer has more than one transaction in a day
+sameDayTransact <- customerTransactions %>% group_by(CustomerID, transactionDate) %>% summarise(totalSpend = sum(Spends, na.rm = TRUE), no_of_tran = n_distinct(transactionID))
+
+singleDayTran <- sameDayTransact[sameDayTransact$no_of_tran > 1, ]
+distinctCustomers <- length(unique(singleDayTran$CustomerID))
+
+print(paste("There are ", distinctCustomers, " customers who have transacted more than once in a day", sep = ""))
+print(paste("Ignoring this insight as this doesn't really help me achieve anything"))
+
+```
+
+### Explanatory variables formation
+
+```{r explanatory variables, echo=FALSE}
+ADS <- customerTransactions %>% group_by(CustomerID) %>% summarise(totalSpends = sum(Spends), latestVisit = max(transactionDate), noOfTransactions = n_distinct(transactionID), recencyDays = (latestDate - max(transactionDate)))
+ADS <- data.frame(ADS)
+
+print(head(ADS))
+adsNames <- colnames(ADS)
+
+print(paste(adsNames[5], ": number of days between ", latestDate, " and the last day of the transaction of the customer", sep = ""))
+print(paste(adsNames[4], ": Total number of transactions made by the customer within the year", sep = ""))
+print(paste(adsNames[3], ": Date of the last transaction made by the customer", sep = ""))
+print(paste(adsNames[2], ": Dollar value of all the transactions made by the customer", sep = ""))
+
+## Merging back to the original dataset
+adsFinal <- merge(customerAttrVis, ADS, by.x = "CustomerId", by.y = "CustomerID", all.x = TRUE)
+# adsFinalBehaviour <- merge(customerAttrVis, ADS, by.x = "CustomerId", by.y = "CustomerID", all.y = TRUE)
+print(head(adsFinal))
+```
+
+
+
+
+
+
